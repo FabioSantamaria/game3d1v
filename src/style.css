@@ -58,6 +58,11 @@ body {
   letter-spacing: 0.02em;
 }
 
+#objective {
+  font-size: 14px;
+  color: rgba(255, 214, 153, 0.95);
+}
+
 .hint {
   font-size: 14px;
   color: rgba(235, 245, 255, 0.8);
