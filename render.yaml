@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: game3d1v
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
