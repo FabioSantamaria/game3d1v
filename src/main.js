@@ -5,8 +5,15 @@ const app = document.querySelector('#app')
 app.innerHTML = `
   <div id="ui">
     <div class="title">Open World 3D</div>
-    <div id="objective"></div>
     <div class="hint">Click to lock mouse · WASD move · Space jump · Shift sprint</div>
+    <div id="objective"></div>
+  </div>
+  <div id="mobile-controls">
+    <div id="joystick" class="joystick">
+      <div class="joystick-handle"></div>
+    </div>
+    <div id="jump-btn" class="mobile-btn">JUMP</div>
+    <div id="sprint-btn" class="mobile-btn">SPRINT</div>
   </div>
   <canvas id="game"></canvas>
 `
@@ -224,6 +231,87 @@ document.addEventListener('keyup', (event) => {
   keys.delete(event.code)
 })
 
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+let touchJoystickActive = false
+let joystickOrigin = { x: 0, y: 0 }
+let joystickVector = { x: 0, y: 0 }
+
+const joystick = document.querySelector('#joystick')
+const joystickHandle = document.querySelector('.joystick-handle')
+const jumpBtn = document.querySelector('#jump-btn')
+const sprintBtn = document.querySelector('#sprint-btn')
+const mobileControls = document.querySelector('#mobile-controls')
+
+if (isMobile) {
+  mobileControls.style.display = 'flex'
+  
+  const handleJoystickStart = (event) => {
+    event.preventDefault()
+    touchJoystickActive = true
+    const rect = joystick.getBoundingClientRect()
+    joystickOrigin.x = rect.left + rect.width / 2
+    joystickOrigin.y = rect.top + rect.height / 2
+    updateJoystick(event)
+  }
+  
+  const handleJoystickMove = (event) => {
+    if (!touchJoystickActive) return
+    event.preventDefault()
+    updateJoystick(event)
+  }
+  
+  const handleJoystickEnd = () => {
+    touchJoystickActive = false
+    joystickVector = { x: 0, y: 0 }
+    joystickHandle.style.transform = 'translate(0px, 0px)'
+  }
+  
+  const updateJoystick = (event) => {
+    const touch = event.touches ? event.touches[0] : event
+    const deltaX = touch.clientX - joystickOrigin.x
+    const deltaY = touch.clientY - joystickOrigin.y
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    const maxDistance = 40
+    
+    if (distance > maxDistance) {
+      const angle = Math.atan2(deltaY, deltaX)
+      joystickVector.x = Math.cos(angle) * maxDistance
+      joystickVector.y = Math.sin(angle) * maxDistance
+      joystickHandle.style.transform = `translate(${joystickVector.x}px, ${joystickVector.y}px)`
+    } else {
+      joystickVector.x = deltaX
+      joystickVector.y = deltaY
+      joystickHandle.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+    }
+  }
+  
+  joystick.addEventListener('touchstart', handleJoystickStart)
+  joystick.addEventListener('touchmove', handleJoystickMove)
+  joystick.addEventListener('touchend', handleJoystickEnd)
+  joystick.addEventListener('touchcancel', handleJoystickEnd)
+  
+  jumpBtn.addEventListener('touchstart', () => keys.add('Space'))
+  jumpBtn.addEventListener('touchend', () => keys.delete('Space'))
+  jumpBtn.addEventListener('touchcancel', () => keys.delete('Space'))
+  
+  sprintBtn.addEventListener('touchstart', () => keys.add('ShiftLeft'))
+  sprintBtn.addEventListener('touchend', () => keys.delete('ShiftLeft'))
+  sprintBtn.addEventListener('touchcancel', () => keys.delete('ShiftLeft'))
+  
+  canvas.addEventListener('touchmove', (event) => {
+    if (event.touches.length > 1) {
+      event.preventDefault()
+      const touch1 = event.touches[0]
+      const touch2 = event.touches[1]
+      const deltaX = (touch2.clientX - touch1.clientX) * 0.01
+      const deltaY = (touch2.clientY - touch1.clientY) * 0.01
+      yaw -= deltaX
+      pitch -= deltaY
+      pitch = clamp(pitch, -0.9, 0.9)
+    }
+  })
+}
+
 const clock = new THREE.Clock()
 
 const worldRadius = 240
@@ -231,14 +319,24 @@ const characterRadius = 0.8
 const groundHeight = 1.8
 
 const updateMovement = (delta) => {
-  const moveForward = keys.has('KeyW')
-  const moveBackward = keys.has('KeyS')
-  const moveLeft = keys.has('KeyA')
-  const moveRight = keys.has('KeyD')
+  let moveForward = keys.has('KeyW')
+  let moveBackward = keys.has('KeyS')
+  let moveLeft = keys.has('KeyA')
+  let moveRight = keys.has('KeyD')
   const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight')
+  
+  if (isMobile && touchJoystickActive) {
+    const joystickStrength = Math.sqrt(joystickVector.x * joystickVector.x + joystickVector.y * joystickVector.y) / 40
+    if (joystickStrength > 0.1) {
+      moveForward = joystickVector.y < -10
+      moveBackward = joystickVector.y > 10
+      moveLeft = joystickVector.x < -10
+      moveRight = joystickVector.x > 10
+    }
+  }
 
   const input = new THREE.Vector3(
-    (moveRight ? 1 : 0) - (moveLeft ? 1 : 0),
+    (moveLeft ? 1 : 0) - (moveRight ? 1 : 0),
     0,
     (moveForward ? 1 : 0) - (moveBackward ? 1 : 0)
   )
